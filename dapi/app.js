@@ -1,24 +1,10 @@
-// var MongoClient = require('mongodb').MongoClient;
-// var url = "mongodb://localhost:27017/mydb";
-
-// MongoClient.connect(url, function(err, db) {
-//   if (err) throw err;
-//   var dbo = db.db("mydb");
-//   var myobj = { name: "Company Inc", address: "Highway 37" };
-//   dbo.collection("customers").insertOne(myobj, function(err, res) {
-//     if (err) throw err;
-//     console.log("1 document inserted");
-//     db.close();
-//   });
-// });
-
 var cors = require('cors');
 require('dotenv').config()
 
-// connect mongodb
+// connect mongodbnode
 var express = require('express'),
   app = express(),
-  port = process.env.Port || 3001
+  port = process.env.Port || 3000
   mongoose = require('mongoose'),
   Addr = require('./db/models/addressModel'),
   bodyParser = require('body-parser');
@@ -50,5 +36,5 @@ app.use(function(req, res) {
   res.status(404).send({url: req.originalUrl + ' not found'})
 });
 
-app.listen(3001)
+app.listen(3000)
 console.log('API server started on: ' + port);

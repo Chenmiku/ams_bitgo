@@ -33,16 +33,16 @@ console.dir(key)
 // const INFURA_ACCESS_TOKEN = process.env.AccessToken //'9dbfe23237eb4aaba35ddf287bc7c9da' //'sr0bmrEU4BjPyWgUpMZZ'
 // const mainnet = process.env.Provider + INFURA_ACCESS_TOKEN //'https://mainnet.infura.io/v3/'+INFURA_ACCESS_TOKEN
 // const w3 = new Web3(new Web3.providers.HttpProvider(mainnet))
-// var result = w3.eth.accounts.create()
-// add = result.address
+// var res = w3.eth.accounts.create()
+// add = res.address
 
 // w3.eth.getGasPrice().then(console.log)
 
-var result = {
-  addr: String,
-  name: String,
-  ctime: String
-}
+// var result = {
+//   addr: String,
+//   name: String,
+//   ctime: String
+// }
 
 exports.list_all_addresses = async(req, res) => {
     await Addr.find({}, function(err, address) {
