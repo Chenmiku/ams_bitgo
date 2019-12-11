@@ -7,6 +7,9 @@ var express = require('express'),
   port = process.env.Port || 3000
   mongoose = require('mongoose'),
   Addr = require('./db/models/addressModel'),
+  Wallet = require('./db/models/walletModel'),
+  AddrKey = require('./db/models/addressKeyModel'),
+  Transaction = require('./db/models/transactionModel'),
   bodyParser = require('body-parser');
 
 mongoose.Promise = global.Promise;

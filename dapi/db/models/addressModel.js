@@ -7,33 +7,29 @@ var addressSchema = new schema({
     _id: {
         type: String
     },
-    addr: {
-        type: String,
-        required: true
+    id: {
+        type: String
     },
-    name: {
-        type: String,
-        required: true
+    wallet_id: {
+        type: String
+    },
+    addr: {
+        type: String
+    },
+    coin_type: {
+        type: String
     },
     ctime: {
-        type: String
+        type: String,
     }, 
     mtime: {
+        type: String
+    },
+    dtime: {
         type: String
     }
 }, {
     versionKey: false // remove __v
-})
-
-// change display _id to id
-addressSchema.method('transform', function() {
-    var obj = this.toObject()
- 
-    //Rename fields
-    obj.id = obj._id;
-    delete obj._id;
- 
-    return obj;
 })
 
 module.exports = mongoose.model('addresses', addressSchema)

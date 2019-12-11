@@ -25,6 +25,7 @@
     "mongodb": "^3.3.5",
     "mongoose": "^5.7.12",
     "ololog": "^1.1.149",
+    "randomstring": "^1.1.5",
     "uuid": "^3.3.3",
     "web3": "^1.2.4"
   }

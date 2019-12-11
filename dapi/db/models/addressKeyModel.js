@@ -7,32 +7,29 @@ var addresskeySchema = new schema({
     _id: {
         type: String
     },
-    addr: {
+    id: {
         type: String
     },
     public_key: {
-        type: String
+        type: String,
+        required: true
     },
     private_key: {
-        type: String
+        type: String,
+        required: true
     },
     ctime: {
-        type: Date,
-        default: Date.now()
+        type: String,
+        required: true
     }, 
+    mtime: {
+        type: String
+    },
+    dtime: {
+        type: String
+    }
 }, {
     versionKey: false // remove __v
-})
-
-// change display _id to id
-addresskeySchema.method('transform', function() {
-    var obj = this.toObject()
- 
-    //Rename fields
-    obj.id = obj._id;
-    delete obj._id;
- 
-    return obj;
 })
 
 module.exports = mongoose.model('addresskeys', addresskeySchema)
