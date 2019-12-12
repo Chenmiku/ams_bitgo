@@ -1,1 +1,0 @@
-exports.version = 'v1'

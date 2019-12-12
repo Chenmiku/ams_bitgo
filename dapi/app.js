@@ -1,9 +1,9 @@
-var cors = require('cors');
+// library
 require('dotenv').config()
 
-// connect mongodbnode
 var express = require('express'),
   app = express(),
+  cors = require('cors'),
   port = process.env.Port || 3000
   mongoose = require('mongoose'),
   Addr = require('./db/models/addressModel'),
@@ -12,11 +12,13 @@ var express = require('express'),
   Transaction = require('./db/models/transactionModel'),
   bodyParser = require('body-parser');
 
+// connect mongodbnode
 mongoose.Promise = global.Promise;
 mongoose.connect('mongodb://' + process.env.DBHost + '/' + process.env.DBName, { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false, useCreateIndex: true })
 .then(() => console.log("Connected to DB"))
 .catch(err => console.error("Couldn't connect to DB"))
 
+// setting for bodyparser
 app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 app.use(bodyParser.json()); // support json encoded bodies
 app.use(cors({ origin: '*' }));
@@ -33,11 +35,16 @@ app.use(function(req, res, next){
 // routes
 var addrRoutes = require('./routes/addressRoutes');
 app.use('/api/' + process.env.Version + '/public/address', addrRoutes);
+var tranRoutes = require('./routes/transactionRoutes');
+app.use('/api/' + process.env.Version + '/public/transaction', tranRoutes);
+var waRoutes = require('./routes/walletRoutes');
+app.use('/api/' + process.env.Version + '/public/wallet', waRoutes);
 
 // middlewares
 app.use(function(req, res) {
   res.status(404).send({url: req.originalUrl + ' not found'})
 });
 
+// listen
 app.listen(3000)
 console.log('API server started on: ' + port);

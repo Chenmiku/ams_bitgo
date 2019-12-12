@@ -2,12 +2,10 @@
 
 const express = require('express');
 const router = express.Router();
-const walletController = require('../api/public/addressController');
+const transactionController = require('../api/public/transactionController');
 
-router.get('/getall', addrController.list_all_addresses)
-router.post('/generate', addrController.create_a_address)
-router.get('/get/:id', addrController.read_a_address)
-router.put('/update/:id', addrController.update_a_address)
-router.delete('/mark_delete/:id', addrController.delete_a_address)
+router.get('/get_all', transactionController.list_all_transaction)
+router.post('/deposit_state_by_address', transactionController.check_deposit_state)
+router.post('/send_coin_to_polebit', transactionController.create_a_transaction)
 
 module.exports = router

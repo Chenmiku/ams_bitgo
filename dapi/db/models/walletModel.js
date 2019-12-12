@@ -22,6 +22,12 @@ var walletSchema = new schema({
     balance_string: {
         type: String
     },
+    confirmed_balance: {
+        type: Number
+    },
+    confirmed_balance_string: {
+        type: String
+    },
     unconfirmed_balance: {
         type: Number
     },
