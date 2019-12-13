@@ -101,7 +101,6 @@ exports.create_a_transaction = async(req, res) => {
       'Content-Type': 'application/x-www-form-urlencoded'
     }
   }
-
 	await axios.post(process.env.GetFeeURL, qs.stringify(requestBody), config)
 	.then(function(res){
     console.log(res.data.resp)
@@ -112,12 +111,13 @@ exports.create_a_transaction = async(req, res) => {
     return
   });
   
-  console.log(chkFeeValue)
   //get balance address
   await bitgo.coin(coin).wallets().getWalletByAddress({ address: sender })
   .then(async(wallet) => {
     // get wallet 
-    await Wallet.findOne({ id: wallet._wallet.id }, function(err,wa){
+    let walletInstance = wallet._wallet
+    console.log(walletInstance)
+    await Wallet.findOne({ id: walletInstance.id }, function(err,wa){
       if (err) {
         errorResponse('address_not_found', res, 404);
         return
@@ -135,31 +135,32 @@ exports.create_a_transaction = async(req, res) => {
     switch(coin) {
       case 'btc':
         params = {
-          amount: wallet.balance - chkFeeValue,
+          amount: walletInstance.balance - 10000,
           address: receiver,
           walletPassphrase: walletPassphrase
         };
         break;
       case 'eth':
         params = {
-          amount: wallet.balance - chkFeeValue * 1000000000 * 21000,
+          amount: walletInstance.balance - chkFeeValue * 1000000000 * 21000,
           address: receiver,
           walletPassphrase: walletPassphrase
         };
         break;
       default :
         params = {
-          amount: wallet.balance - chkFeeValue,
+          amount: walletInstance.balance - chkFeeValue,
           address: receiver,
           walletPassphrase: walletPassphrase
         };
         break;
     }
+    console.log(params)
 
     // send transaction
     await wallet.send(params)
     .then(function(transaction) {
-        console.dir(transaction);
+        console.log(transaction);
         trans._id = uuidv1()
         trans.id = transaction.transfer.id
         trans.tran_id = transaction.txid
@@ -167,9 +168,9 @@ exports.create_a_transaction = async(req, res) => {
         trans.sender = sender
         trans.receiver = receiver
         trans.coin_type = coin
-        trans.total_exchanged = transaction.transfer.value
-        trans.total_exchanged_string = transaction.transfer.valueString
-        trans.fees = transaction.transfer.fee
+        trans.total_exchanged = Math.abs(transaction.transfer.baseValue)
+        trans.total_exchanged_string = transaction.transfer.baseValueString
+        trans.fees = parseInt(transaction.transfer.feeString)
         trans.fees_string = transaction.transfer.feeString
         trans.size = transaction.transfer.vSize
         trans.state = transaction.transfer.state
@@ -179,9 +180,13 @@ exports.create_a_transaction = async(req, res) => {
         trans.mtime = new Date().toISOString().replace('T', ' ').replace('Z', '')
 
         transactionResult.data.tx_hash = transaction.tx
-        transactionResult.data.tx_value = String(convert.convertToCoin(coin, transaction.transfer.value))
-        transactionResult.data.tx_fee = String(convert.convertToCoin(coin, transaction.transfer.fee))
-        transactionResult.data.tx_total_amount = String(convert.convertToCoin(coin, transaction.transfer.value) + convert.convertToCoin(coin, transaction.transfer.fee))
+        transactionResult.data.chk_fee_value = chkFeeValue
+        transactionResult.data.tx_value = String(convert.convertToCoin(coin, trans.total_exchanged))
+        transactionResult.data.tx_fee = String(convert.convertToCoin(coin, trans.fees))
+        transactionResult.data.tx_total_amount = String(convert.convertToCoin(coin, Math.abs(transaction.transfer.value)))
+        console.log(parseFloat(transactionResult.data.pre_balance))
+        console.log(parseFloat(transactionResult.data.tx_total_amount))
+        console.log(parseFloat(transactionResult.data.pre_balance) - parseFloat(transactionResult.data.tx_total_amount))
         transactionResult.data.next_balance = String(parseFloat(transactionResult.data.pre_balance) - parseFloat(transactionResult.data.tx_total_amount))
         transactionResult.data.tx_create_time = trans.ctime
         
@@ -244,6 +249,7 @@ exports.check_deposit_state = async(req, res) => {
   await bitgo.coin(coin).wallets().getWalletByAddress({ address: addr })
   .then(function(wallet) {
     let wa = wallet._wallet
+    console.log(wallet._wallet.balance)
     new_wallet.id = wa.id
     new_wallet.balance = wa.balance || 0
     new_wallet.balance_string = wa.balanceString
@@ -265,15 +271,28 @@ exports.check_deposit_state = async(req, res) => {
       return
     }
     wallet = wa
+    console.log(wallet.balance)
   })
 
   // check transaction state
   if (wallet.balance != new_wallet.balance) {
+    console.log('confirm')
     depositStateResult.data.coin_type = coin
     depositStateResult.data.coin_value = String(convert.convertToCoin(coin, new_wallet.balance - wallet.balance))
     depositStateResult.data.confirm = true
     depositStateResult.data.message = "transaction_confirmed"
     depositStateResult.success = true
+
+    // update wallet
+    await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
+      if (err) {
+        errorResponse('address_not_found', res, 404);
+        return
+      } else {
+        res.json(depositStateResult);
+        return
+      }
+    });
   }
 
   if (new_wallet.unconfirmed_balance > 0) {
@@ -282,22 +301,25 @@ exports.check_deposit_state = async(req, res) => {
     depositStateResult.data.confirm = false
     depositStateResult.data.message = "transaction_pending"
     depositStateResult.success = true
+
+    // update wallet
+    await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
+      if (err) {
+        errorResponse('address_not_found', res, 404);
+      } else {
+        res.json(depositStateResult);
+      }
+    });
   } else {
     depositStateResult.data.coin_type = coin
     depositStateResult.data.coin_value = 0
     depositStateResult.data.confirm = false
     depositStateResult.data.message = "no_transaction"
     depositStateResult.success = true
+
+    res.json(depositStateResult);
   }
 
-  // update wallet
-  await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
-    if (err) {
-      errorResponse('address_not_found', res, 404);
-    } else {
-      res.json(depositStateResult);
-    }
-  });
 };
 
 // error message response

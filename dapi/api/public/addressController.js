@@ -191,6 +191,7 @@ exports.get_a_address = async(req, res) => {
   await bitgo.coin(coin).wallets().getWalletByAddress({ address: addr })
   .then(function(wallet) {
     let wa = wallet._wallet
+    console.log(wallet._wallet)
     new_wallet.id = wa.id
     new_wallet.balance = wa.balance || 0
     new_wallet.balance_string = wa.balanceString
