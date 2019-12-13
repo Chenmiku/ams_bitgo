@@ -16,6 +16,9 @@ var walletSchema = new schema({
     pass_pharse: {
         type: String
     },
+    enterprise_id: {
+        type: String
+    },
     balance: {
         type: Number
     },

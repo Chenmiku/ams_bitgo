@@ -19,6 +19,15 @@ var transactionSchema = new schema({
     hash: {
         type: String
     },
+    sender: {
+        type: String
+    },
+    receiver: {
+        type: String
+    },
+    coin_type: {
+        type: String
+    },
     total_exchanged: {
         type: Number
     },

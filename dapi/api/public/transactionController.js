@@ -1,41 +1,58 @@
 'use strict';
 
+// library and modules
 const mongoose = require('mongoose'),
   Addr = mongoose.model('addresses'),
   Wallet = mongoose.model('wallets'),
   Trans = mongoose.model('transactions'),
   uuidv1 = require('uuid/v1'),
   url = require('url'),
-  convert = require('../modules/convert_to_coin')
+  convert = require('../modules/convert_to_coin'),
+  axios = require('axios'),
+  qs = require('querystring')
 
 //bitgo
 const BitGoJS = require('bitgo')
 const bitgo = new BitGoJS.BitGo({ env: 'prod'  })
 const accessToken = process.env.AccessToken
 bitgo.authenticateWithAccessToken({ accessToken });
+
+// variables
 var coin = 'btc'
 
 var transactionResult = {
-  confirm:         Boolean,    
-	message:         String, 
-	tx_hash:         String,  
-	tx_type:         String,  
-	tx_value:        Float64Array, 
-	tx_fee:          Float64Array, 
-	chk_fee_value:   Number, 
-	tx_total_amount: Float64Array,     // Value + Fee
-	pre_balance:     Float64Array,     // balance
-	next_balance:    Float64Array,     // Current Balance in wallet - Total Transaction Amount
-	tx_create_time:  String
-}
+  data: {
+    confirm:         Boolean,    
+    message:         String, 
+    tx_hash:         String,  
+    tx_type:         String,  
+    tx_value:        String, 
+    tx_fee:          String, 
+    chk_fee_value:   Number, 
+    tx_total_amount: String,     // Value + Fee
+    pre_balance:     String,     // balance
+    next_balance:    String,     // Current Balance in wallet - Total Transaction Amount
+    tx_create_time:  String
+  },
+  success: Boolean,
+};
 
 var depositStateResult = {
-  coin_type:  String,  
-	coin_value: Float64Array, 
-	confirm:    Boolean,    
-	message:    String, 
-}
+  data: {
+    coin_type:  String,  
+    coin_value: String, 
+    confirm:    Boolean,    
+    message:    String, 
+  },
+  success: Boolean,
+};
 
+var errorMessage = {
+  message: String,
+  success: Boolean,
+};
+
+// api get all transaction 
 exports.list_all_transaction = async(req, res) => {
     await Trans.find({}, function(err, transaction) {
       if (err)
@@ -44,12 +61,25 @@ exports.list_all_transaction = async(req, res) => {
   });
 };
 
+// api send coin to polebit
 exports.create_a_transaction = async(req, res) => {
   let q = url.parse(req.url, true).query;
   const coinType = q.coin_type;
+  const sender = q.sender
   const receiver = q.receiver
   const value = q.value
+  var wallet = new Wallet()
+  var trans = new Trans()
+  var chkFeeValue = 20
+  var walletPassphrase = ""
 
+  // check params
+  if (sender == "" || receiver == "") {
+    errorMessage('sender_or_receiver_empty', res, 400)
+    return
+  }
+
+  // check coin type
   switch(coinType) {
     case 'btc':
       coin = 'btc';
@@ -62,15 +92,128 @@ exports.create_a_transaction = async(req, res) => {
       break;
   }
 
-  var new_address = new Addr(req.body);   
-  new_address.save(function(err, addr) {
-    if (err) {
-      res.status(500).send(err);
+  // get chk fee value
+  const requestBody = {
+    'search_type': coinType
+  }
+  const config = {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
     }
-    res.status(201).json(addr);
+  }
+
+	await axios.post(process.env.GetFeeURL, qs.stringify(requestBody), config)
+	.then(function(res){
+    console.log(res.data.resp)
+		chkFeeValue = Number(res.data.resp[0].chk_fee_value)
+	})
+	.catch(function(err){
+		errorResponse('cant_get_fee', res, 500);
+    return
   });
+  
+  console.log(chkFeeValue)
+  //get balance address
+  await bitgo.coin(coin).wallets().getWalletByAddress({ address: sender })
+  .then(async(wallet) => {
+    // get wallet 
+    await Wallet.findOne({ id: wallet._wallet.id }, function(err,wa){
+      if (err) {
+        errorResponse('address_not_found', res, 404);
+        return
+      }
+      walletPassphrase = wa.pass_pharse
+
+      trans.wallet_id = wa._id
+
+      transactionResult.data.pre_balance = String(convert.convertToCoin(coin, wa.balance))
+    });
+
+    let params = {};
+
+    // set params for request send transaction
+    switch(coin) {
+      case 'btc':
+        params = {
+          amount: wallet.balance - chkFeeValue,
+          address: receiver,
+          walletPassphrase: walletPassphrase
+        };
+        break;
+      case 'eth':
+        params = {
+          amount: wallet.balance - chkFeeValue * 1000000000 * 21000,
+          address: receiver,
+          walletPassphrase: walletPassphrase
+        };
+        break;
+      default :
+        params = {
+          amount: wallet.balance - chkFeeValue,
+          address: receiver,
+          walletPassphrase: walletPassphrase
+        };
+        break;
+    }
+
+    // send transaction
+    await wallet.send(params)
+    .then(function(transaction) {
+        console.dir(transaction);
+        trans._id = uuidv1()
+        trans.id = transaction.transfer.id
+        trans.tran_id = transaction.txid
+        trans.hash = transaction.tx
+        trans.sender = sender
+        trans.receiver = receiver
+        trans.coin_type = coin
+        trans.total_exchanged = transaction.transfer.value
+        trans.total_exchanged_string = transaction.transfer.valueString
+        trans.fees = transaction.transfer.fee
+        trans.fees_string = transaction.transfer.feeString
+        trans.size = transaction.transfer.vSize
+        trans.state = transaction.transfer.state
+        trans.block_height = transaction.transfer.height
+        trans.signed_time = transaction.transfer.signedTime.replace('T', ' ').replace('Z', '')
+        trans.ctime = new Date().toISOString().replace('T', ' ').replace('Z', '')
+        trans.mtime = new Date().toISOString().replace('T', ' ').replace('Z', '')
+
+        transactionResult.data.tx_hash = transaction.tx
+        transactionResult.data.tx_value = String(convert.convertToCoin(coin, transaction.transfer.value))
+        transactionResult.data.tx_fee = String(convert.convertToCoin(coin, transaction.transfer.fee))
+        transactionResult.data.tx_total_amount = String(convert.convertToCoin(coin, transaction.transfer.value) + convert.convertToCoin(coin, transaction.transfer.fee))
+        transactionResult.data.next_balance = String(parseFloat(transactionResult.data.pre_balance) - parseFloat(transactionResult.data.tx_total_amount))
+        transactionResult.data.tx_create_time = trans.ctime
+        
+        return
+    })
+    .catch(function(err){
+      errorResponse('not_enough_fund', res, 500);
+      return
+    });
+
+  })
+  .catch(function(err){
+    errorResponse('address_not_found', res, 404);
+    return
+  });
+
+  // create a new transaction
+  await trans.save(function(err,tran){
+    if (err) {
+      errorResponse('error_create_transaction', res, 500)
+    } else {
+      transactionResult.data.confirm = false
+      transactionResult.data.message = "transaction_pending"
+      transactionResult.data.tx_type = coin
+      transactionResult.success = true
+
+      res.json(transactionResult);
+    }
+  })
 };
 
+// api check deposit state by address
 exports.check_deposit_state = async(req, res) => {
   let q = url.parse(req.url, true).query;
   const coinType = q.coin_type;
@@ -78,6 +221,13 @@ exports.check_deposit_state = async(req, res) => {
   var wallet = new Wallet()
   var new_wallet = new Wallet()
 
+  // check params
+  if (addr == "") {
+    errorMessage('address_empty', res, 400)
+    return
+  }
+
+  // check coin type
   switch(coinType) {
     case 'btc':
       coin = 'btc';
@@ -102,39 +252,57 @@ exports.check_deposit_state = async(req, res) => {
     new_wallet.unconfirmed_balance = wa.spendableBalance || 0
     new_wallet.unconfirmed_balance_string = wa.spendableBalanceString
     new_wallet.mtime = new Date().toISOString().replace('T', ' ').replace('Z', '')
+  })
+  .catch(function(err){
+    errorResponse('address_not_found', res, 404);
+    return
   });
 
+  // get wallet by id 
   await Wallet.findOne({ id: new_wallet.id }, function(err, wa){
     if (err) {
+      errorResponse('address_not_found', res, 404);
       return
     }
     wallet = wa
   })
 
+  // check transaction state
   if (wallet.balance != new_wallet.balance) {
-    depositStateResult.coin_type = coin
-    depositStateResult.coin_value = convert.convertToCoin(new_wallet.balance - wallet.balance)
-    depositStateResult.confirm = true
-    depositStateResult.message = "transaction_confirmed"
+    depositStateResult.data.coin_type = coin
+    depositStateResult.data.coin_value = String(convert.convertToCoin(coin, new_wallet.balance - wallet.balance))
+    depositStateResult.data.confirm = true
+    depositStateResult.data.message = "transaction_confirmed"
+    depositStateResult.success = true
   }
 
   if (new_wallet.unconfirmed_balance > 0) {
-    depositStateResult.coin_type = coin
-    depositStateResult.coin_value = convert.convertToCoin(new_wallet.unconfirmed_balance)
-    depositStateResult.confirm = false
-    depositStateResult.message = "transaction_pending"
+    depositStateResult.data.coin_type = coin
+    depositStateResult.data.coin_value = String(convert.convertToCoin(coin, new_wallet.unconfirmed_balance))
+    depositStateResult.data.confirm = false
+    depositStateResult.data.message = "transaction_pending"
+    depositStateResult.success = true
   } else {
-    depositStateResult.coin_type = coin
-    depositStateResult.coin_value = 0
-    depositStateResult.confirm = false
-    depositStateResult.message = "no_transaction"
+    depositStateResult.data.coin_type = coin
+    depositStateResult.data.coin_value = 0
+    depositStateResult.data.confirm = false
+    depositStateResult.data.message = "no_transaction"
+    depositStateResult.success = true
   }
 
+  // update wallet
   await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
     if (err) {
-      res.status(500).send(err);
+      errorResponse('address_not_found', res, 404);
     } else {
       res.json(depositStateResult);
     }
   });
 };
+
+// error message response
+function errorResponse(err, res, statusCode) {
+  errorMessage.message = err
+  errorMessage.success = false
+  res.status(statusCode).json(errorMessage);
+}
