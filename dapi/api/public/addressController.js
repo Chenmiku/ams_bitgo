@@ -23,13 +23,9 @@ var addressResult = {
   data: {
     addr: String,
     balance: String,
-    unconfirmed_balance: String,
+    spendable_balance: String,
     confirmed_balance: String,
-    final_balance: String,
     coin_type: String,
-    confirmed_transaction: Number,
-    unconfirmed_transaction: Number,
-    final_transaction: Number,
     user_id: Number,
     ctime: String,
     mtime: String,
@@ -101,8 +97,8 @@ exports.create_a_address = async(req, res) => {
     new_wallet.balance_string = wa.balanceString
     new_wallet.confirmed_balance = wa.confirmedBalance || 0
     new_wallet.confirmed_balance_string = wa.confirmedBalanceString
-    new_wallet.unconfirmed_balance = wa.spendableBalance || 0
-    new_wallet.unconfirmed_balance_string = wa.spendableBalanceString
+    new_wallet.spendable_balance = wa.spendableBalance || 0
+    new_wallet.spendable_balance_string = wa.spendableBalanceString
     new_wallet.user_id = userId || 0
     new_wallet.coin_type = coin
     new_wallet.ctime = new Date().toISOString().replace('T', ' ').replace('Z', '')
@@ -144,13 +140,9 @@ exports.create_a_address = async(req, res) => {
     } else {
       addressResult.data.addr = addr.addr
       addressResult.data.balance = String(convert.convertToCoin(coin, new_wallet.balance))
-      addressResult.data.unconfirmed_balance = String(convert.convertToCoin(coin, new_wallet.unconfirmed_balance))
+      addressResult.data.spendable_balance = String(convert.convertToCoin(coin, new_wallet.spendable_balance))
       addressResult.data.confirmed_balance = String(convert.convertToCoin(coin, new_wallet.confirmed_balance))
-      addressResult.data.final_balance = ""
       addressResult.data.coin_type = coin
-      addressResult.data.confirmed_transaction = 0
-      addressResult.data.unconfirmed_transaction = 0
-      addressResult.data.final_transaction = 0
       addressResult.data.user_id = new_wallet.user_id || 0
       addressResult.data.ctime = new_address.ctime
       addressResult.data.mtime = new_address.mtime
@@ -197,8 +189,8 @@ exports.get_a_address = async(req, res) => {
     new_wallet.balance_string = wa.balanceString
     new_wallet.confirmed_balance = wa.confirmedBalance || 0
     new_wallet.confirmed_balance_string = wa.confirmedBalanceString
-    new_wallet.unconfirmed_balance = wa.spendableBalance || 0
-    new_wallet.unconfirmed_balance_string = wa.spendableBalanceString
+    new_wallet.spendable_balance = wa.spendableBalance || 0
+    new_wallet.spendable_balance_string = wa.spendableBalanceString
     new_wallet.mtime = new Date().toISOString().replace('T', ' ').replace('Z', '')
   })
   .catch(function(err){
@@ -213,13 +205,9 @@ exports.get_a_address = async(req, res) => {
     } else {
       addressResult.data.addr = addr
       addressResult.data.balance = String(convert.convertToCoin(coin, new_wallet.balance))
-      addressResult.data.unconfirmed_balance = String(convert.convertToCoin(coin, new_wallet.unconfirmed_balance))
+      addressResult.data.spendable_balance = String(convert.convertToCoin(coin, new_wallet.spendable_balance))
       addressResult.data.confirmed_balance = String(convert.convertToCoin(coin, new_wallet.confirmed_balance))
-      addressResult.data.final_balance = ""
       addressResult.data.coin_type = coin
-      addressResult.data.confirmed_transaction = 0
-      addressResult.data.unconfirmed_transaction = 0
-      addressResult.data.final_transaction = 0
       addressResult.data.user_id = wa.user_id || 0
       addressResult.data.ctime = new_wallet.ctime
       addressResult.data.mtime = new_wallet.mtime

@@ -2,7 +2,6 @@
 
 // library and modules
 const mongoose = require('mongoose'),
-  Addr = mongoose.model('addresses'),
   Wallet = mongoose.model('wallets'),
   Trans = mongoose.model('transactions'),
   uuidv1 = require('uuid/v1'),
@@ -67,8 +66,6 @@ exports.create_a_transaction = async(req, res) => {
   const coinType = q.coin_type;
   const sender = q.sender
   const receiver = q.receiver
-  const value = q.value
-  var wallet = new Wallet()
   var trans = new Trans()
   var chkFeeValue = 20
   var walletPassphrase = ""
@@ -103,7 +100,6 @@ exports.create_a_transaction = async(req, res) => {
   }
 	await axios.post(process.env.GetFeeURL, qs.stringify(requestBody), config)
 	.then(function(res){
-    console.log(res.data.resp)
 		chkFeeValue = Number(res.data.resp[0].chk_fee_value)
 	})
 	.catch(function(err){
@@ -155,7 +151,6 @@ exports.create_a_transaction = async(req, res) => {
         };
         break;
     }
-    console.log(params)
 
     // send transaction
     await wallet.send(params)
@@ -168,7 +163,7 @@ exports.create_a_transaction = async(req, res) => {
         trans.sender = sender
         trans.receiver = receiver
         trans.coin_type = coin
-        trans.total_exchanged = Math.abs(transaction.transfer.baseValue)
+        trans.total_exchanged = transaction.transfer.baseValue
         trans.total_exchanged_string = transaction.transfer.baseValueString
         trans.fees = parseInt(transaction.transfer.feeString)
         trans.fees_string = transaction.transfer.feeString
@@ -181,13 +176,10 @@ exports.create_a_transaction = async(req, res) => {
 
         transactionResult.data.tx_hash = transaction.tx
         transactionResult.data.chk_fee_value = chkFeeValue
-        transactionResult.data.tx_value = String(convert.convertToCoin(coin, trans.total_exchanged))
+        transactionResult.data.tx_value = String(convert.convertToCoin(coin, Math.abs(trans.total_exchanged)))
         transactionResult.data.tx_fee = String(convert.convertToCoin(coin, trans.fees))
         transactionResult.data.tx_total_amount = String(convert.convertToCoin(coin, Math.abs(transaction.transfer.value)))
-        console.log(parseFloat(transactionResult.data.pre_balance))
-        console.log(parseFloat(transactionResult.data.tx_total_amount))
-        console.log(parseFloat(transactionResult.data.pre_balance) - parseFloat(transactionResult.data.tx_total_amount))
-        transactionResult.data.next_balance = String(parseFloat(transactionResult.data.pre_balance) - parseFloat(transactionResult.data.tx_total_amount))
+        transactionResult.data.next_balance = (parseFloat(transactionResult.data.pre_balance) - parseFloat(transactionResult.data.tx_total_amount)).toFixed(8)
         transactionResult.data.tx_create_time = trans.ctime
         
         return
@@ -249,14 +241,14 @@ exports.check_deposit_state = async(req, res) => {
   await bitgo.coin(coin).wallets().getWalletByAddress({ address: addr })
   .then(function(wallet) {
     let wa = wallet._wallet
-    console.log(wallet._wallet.balance)
+    console.log(wa)
     new_wallet.id = wa.id
     new_wallet.balance = wa.balance || 0
     new_wallet.balance_string = wa.balanceString
     new_wallet.confirmed_balance = wa.confirmedBalance || 0
     new_wallet.confirmed_balance_string = wa.confirmedBalanceString
-    new_wallet.unconfirmed_balance = wa.spendableBalance || 0
-    new_wallet.unconfirmed_balance_string = wa.spendableBalanceString
+    new_wallet.spendable_balance = wa.spendableBalance || 0
+    new_wallet.spendable_balance_string = wa.spendableBalanceString
     new_wallet.mtime = new Date().toISOString().replace('T', ' ').replace('Z', '')
   })
   .catch(function(err){
@@ -271,14 +263,14 @@ exports.check_deposit_state = async(req, res) => {
       return
     }
     wallet = wa
-    console.log(wallet.balance)
   })
 
-  // check transaction state
-  if (wallet.balance != new_wallet.balance) {
-    console.log('confirm')
+  console.log(new_wallet.balance)
+  console.log(new_wallet.confirmed_balance)
+  console.log(wallet.balance)
+  if (wallet.balance_string != new_wallet.balance_string && new_wallet.balance_string == new_wallet.confirmed_balance_string) {
     depositStateResult.data.coin_type = coin
-    depositStateResult.data.coin_value = String(convert.convertToCoin(coin, new_wallet.balance - wallet.balance))
+    depositStateResult.data.coin_value = String(convert.convertToCoin(coin, Math.abs(new_wallet.balance - wallet.balance)))
     depositStateResult.data.confirm = true
     depositStateResult.data.message = "transaction_confirmed"
     depositStateResult.success = true
@@ -295,31 +287,34 @@ exports.check_deposit_state = async(req, res) => {
     });
   }
 
-  if (new_wallet.unconfirmed_balance > 0) {
+  // check transaction state
+  if (wallet.balance_string != new_wallet.balance_string && new_wallet.balance_string != new_wallet.confirmed_balance_string) {
     depositStateResult.data.coin_type = coin
-    depositStateResult.data.coin_value = String(convert.convertToCoin(coin, new_wallet.unconfirmed_balance))
-    depositStateResult.data.confirm = false
+    depositStateResult.data.coin_value = String(convert.convertToCoin(coin, Math.abs(new_wallet.balance - wallet.balance)))
+    depositStateResult.data.confirm = true
     depositStateResult.data.message = "transaction_pending"
     depositStateResult.success = true
 
+    res.json(depositStateResult);
     // update wallet
-    await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
-      if (err) {
-        errorResponse('address_not_found', res, 404);
-      } else {
-        res.json(depositStateResult);
-      }
-    });
+    // await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
+    //   if (err) {
+    //     errorResponse('address_not_found', res, 404);
+    //     return
+    //   } else {
+    //     res.json(depositStateResult);
+    //     return
+    //   }
+    // });
   } else {
     depositStateResult.data.coin_type = coin
-    depositStateResult.data.coin_value = 0
+    depositStateResult.data.coin_value = "0"
     depositStateResult.data.confirm = false
     depositStateResult.data.message = "no_transaction"
     depositStateResult.success = true
 
     res.json(depositStateResult);
   }
-
 };
 
 // error message response

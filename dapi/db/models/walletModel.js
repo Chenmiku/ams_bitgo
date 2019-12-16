@@ -31,27 +31,21 @@ var walletSchema = new schema({
     confirmed_balance_string: {
         type: String
     },
-    unconfirmed_balance: {
+    spendable_balance: {
         type: Number
     },
-    unconfirmed_balance_string: {
+    spendable_balance_string: {
         type: String
     },
-    final_balance: {
-        type: Number
-    },
-    final_balance_string: {
-        type: String
-    },
-    confirmed_transaction: {
-        type: Number
-    },
-    unconfirmed_transaction: {
-        type: Number
-    },
-    final_transaction: {
-        type: Number
-    },
+    // confirmed_transaction: {
+    //     type: Number
+    // },
+    // unconfirmed_transaction: {
+    //     type: Number
+    // },
+    // final_transaction: {
+    //     type: Number
+    // },
     user_id: {
         type: Number
     },

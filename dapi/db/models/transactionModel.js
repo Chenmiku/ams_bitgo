@@ -46,23 +46,11 @@ var transactionSchema = new schema({
     state: {
         type: String
     },
-    double_spend: {
-        type: Boolean
-    },
     block_height: {
         type: Number
     },
-    confirmed_time: {
-        type: String
-    },
     signed_time: {
         type: String
-    },
-    inputs_transaction: {
-        type: Number
-    },
-    outputs_transaction: {
-        type: Number
     },
     gas_used: {
         type: Number
