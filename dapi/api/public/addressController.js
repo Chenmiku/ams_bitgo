@@ -7,7 +7,8 @@ const mongoose = require('mongoose'),
   Wallet = mongoose.model('wallets'),
   randomString = require('randomstring'),
   url = require('url'),
-  convert = require('../modules/convert_to_coin')
+  convert = require('../modules/convert_to_coin'),
+  re = require('../modules/response')
 
 //bitgo
 const BitGoJS = require('bitgo')
@@ -30,11 +31,6 @@ var addressResult = {
     ctime: String,
     mtime: String,
   },
-  success: Boolean,
-}
-
-var errorMessage = {
-  message: String,
   success: Boolean,
 }
 
@@ -116,19 +112,19 @@ exports.create_a_address = async(req, res) => {
       new_address.mtime = new Date().toISOString().replace('T', ' ').replace('Z', '')
     })
     .catch(function(err){
-      errorResponse(err, res, 500);
+      re.errorResponse(err, res, 500);
       return
     })
   })
   .catch(function(err){
-      errorResponse(err, res, 500);
+      re.errorResponse(err, res, 500);
       return
   });
 
   // create a new wallet
   await new_wallet.save(function(err){
     if(err) {
-      errorResponse(err, res, 500);
+      re.errorResponse(err, res, 500);
       return
     }
   })
@@ -136,7 +132,7 @@ exports.create_a_address = async(req, res) => {
   // create a new address
   await new_address.save(function(err, addr) {
     if(err) {
-      errorResponse('error_create_address', res, 500);
+      re.errorResponse('error_create_address', res, 500);
     } else {
       addressResult.data.addr = addr.addr
       addressResult.data.balance = String(convert.convertToCoin(coin, new_wallet.balance))
@@ -194,14 +190,14 @@ exports.get_a_address = async(req, res) => {
     new_wallet.mtime = new Date().toISOString().replace('T', ' ').replace('Z', '')
   })
   .catch(function(err){
-    errorResponse('address_not_found', res, 404);
+    re.errorResponse('address_not_found', res, 404);
     return
   });
 
   // update wallet 
   await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
     if (err) {
-      errorResponse('address_not_found', res, 404);
+      re.errorResponse('address_not_found', res, 404);
     } else {
       addressResult.data.addr = addr
       addressResult.data.balance = String(convert.convertToCoin(coin, new_wallet.balance))
@@ -217,10 +213,3 @@ exports.get_a_address = async(req, res) => {
     }
   });
 };
-
-// error message response
-function errorResponse(err, res, statusCode) {
-  errorMessage.message = err
-  errorMessage.success = false
-  res.status(statusCode).json(errorMessage);
-}

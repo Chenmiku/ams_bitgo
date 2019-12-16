@@ -8,7 +8,8 @@ const mongoose = require('mongoose'),
   url = require('url'),
   convert = require('../modules/convert_to_coin'),
   axios = require('axios'),
-  qs = require('querystring')
+  qs = require('querystring'),
+  re = require('../modules/response')
 
 //bitgo
 const BitGoJS = require('bitgo')
@@ -43,11 +44,6 @@ var depositStateResult = {
     confirm:    Boolean,    
     message:    String, 
   },
-  success: Boolean,
-};
-
-var errorMessage = {
-  message: String,
   success: Boolean,
 };
 
@@ -103,7 +99,7 @@ exports.create_a_transaction = async(req, res) => {
 		chkFeeValue = Number(res.data.resp[0].chk_fee_value)
 	})
 	.catch(function(err){
-		errorResponse('cant_get_fee', res, 500);
+		re.errorResponse('cant_get_fee', res, 500);
     return
   });
   
@@ -115,7 +111,11 @@ exports.create_a_transaction = async(req, res) => {
     console.log(walletInstance)
     await Wallet.findOne({ id: walletInstance.id }, function(err,wa){
       if (err) {
-        errorResponse('address_not_found', res, 404);
+        re.errorResponse('address_not_found', res, 404);
+        return
+      }
+      if (wa.balance <= 10000) {
+        re.errorResponse('not_enough_fund', res, 500);
         return
       }
       walletPassphrase = wa.pass_pharse
@@ -181,24 +181,22 @@ exports.create_a_transaction = async(req, res) => {
         transactionResult.data.tx_total_amount = String(convert.convertToCoin(coin, Math.abs(transaction.transfer.value)))
         transactionResult.data.next_balance = (parseFloat(transactionResult.data.pre_balance) - parseFloat(transactionResult.data.tx_total_amount)).toFixed(8)
         transactionResult.data.tx_create_time = trans.ctime
-        
-        return
     })
     .catch(function(err){
-      errorResponse('not_enough_fund', res, 500);
+      re.errorResponse('not_enough_fund', res, 500);
       return
     });
 
   })
   .catch(function(err){
-    errorResponse('address_not_found', res, 404);
+    re.errorResponse('address_not_found', res, 404);
     return
   });
 
   // create a new transaction
   await trans.save(function(err,tran){
     if (err) {
-      errorResponse('error_create_transaction', res, 500)
+      re.errorResponse('error_create_transaction', res, 500)
     } else {
       transactionResult.data.confirm = false
       transactionResult.data.message = "transaction_pending"
@@ -252,14 +250,14 @@ exports.check_deposit_state = async(req, res) => {
     new_wallet.mtime = new Date().toISOString().replace('T', ' ').replace('Z', '')
   })
   .catch(function(err){
-    errorResponse('address_not_found', res, 404);
+    re.errorResponse('address_not_found', res, 404);
     return
   });
 
   // get wallet by id 
   await Wallet.findOne({ id: new_wallet.id }, function(err, wa){
     if (err) {
-      errorResponse('address_not_found', res, 404);
+      re.errorResponse('address_not_found', res, 404);
       return
     }
     wallet = wa
@@ -278,7 +276,7 @@ exports.check_deposit_state = async(req, res) => {
     // update wallet
     await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
       if (err) {
-        errorResponse('address_not_found', res, 404);
+        re.errorResponse('address_not_found', res, 404);
         return
       } else {
         res.json(depositStateResult);
@@ -299,7 +297,7 @@ exports.check_deposit_state = async(req, res) => {
     // update wallet
     // await Wallet.findOneAndUpdate({ id: new_wallet.id }, new_wallet, function(err, wa) {
     //   if (err) {
-    //     errorResponse('address_not_found', res, 404);
+    //     re.errorResponse('address_not_found', res, 404);
     //     return
     //   } else {
     //     res.json(depositStateResult);
@@ -316,10 +314,3 @@ exports.check_deposit_state = async(req, res) => {
     res.json(depositStateResult);
   }
 };
-
-// error message response
-function errorResponse(err, res, statusCode) {
-  errorMessage.message = err
-  errorMessage.success = false
-  res.status(statusCode).json(errorMessage);
-}
